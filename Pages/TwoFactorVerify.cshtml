@@ -1,0 +1,46 @@
+@page
+@model appsec_assignment_2.Pages.TwoFactorVerifyModel
+@{
+    ViewData["Title"] = "Two-Factor Verification";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Two-Factor Verification</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Enter the 6-digit code from your authenticator app to complete the login.
+                </p>
+
+                <form method="post" asp-route-returnUrl="@Model.ReturnUrl" asp-route-rememberMe="@Model.RememberMe">
+                    <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.TwoFactorCode" class="form-label"></label>
+                        <input asp-for="Input.TwoFactorCode" class="form-control text-center fs-4" 
+                            placeholder="000000" maxlength="6" autofocus autocomplete="off" />
+                        <span asp-validation-for="Input.TwoFactorCode" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input asp-for="Input.RememberMachine" class="form-check-input" type="checkbox" />
+                        <label asp-for="Input.RememberMachine" class="form-check-label">
+                            Remember this device
+                        </label>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">Verify</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,128 @@
+@page
+@model appsec_assignment_2.Pages.RegisterModel
+@{
+    ViewData["Title"] = "Register";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Register for Ace Job Agency</h4>
+            </div>
+            <div class="card-body">
+                <form id="registerForm" method="post" enctype="multipart/form-data">
+                    <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Input.FirstName" class="form-label"></label>
+                            <input asp-for="Input.FirstName" class="form-control" />
+                            <span asp-validation-for="Input.FirstName" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Input.LastName" class="form-label"></label>
+                            <input asp-for="Input.LastName" class="form-control" />
+                            <span asp-validation-for="Input.LastName" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Input.Gender" class="form-label"></label>
+                            <select asp-for="Input.Gender" class="form-select">
+                                <option value="">Select Gender</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <span asp-validation-for="Input.Gender" class="text-danger"></span>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="Input.DateOfBirth" class="form-label"></label>
+                            <input asp-for="Input.DateOfBirth" type="date" class="form-control" />
+                            <span asp-validation-for="Input.DateOfBirth" class="text-danger"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.NRIC" class="form-label"></label>
+                        <input asp-for="Input.NRIC" class="form-control" placeholder="e.g., S1234567A" />
+                        <span asp-validation-for="Input.NRIC" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.Email" class="form-label"></label>
+                        <input asp-for="Input.Email" class="form-control" type="email" />
+                        <span asp-validation-for="Input.Email" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.Password" class="form-label"></label>
+                        <input asp-for="Input.Password" class="form-control" type="password" id="passwordInput" />
+                        <div id="passwordStrength" class="mt-2">
+                            <div class="progress" style="height: 5px;">
+                                <div id="strengthBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <small id="strengthText" class="text-muted"></small>
+                        </div>
+                        <small class="text-muted">
+                            Password must be at least 12 characters with lowercase, uppercase, number, and special character.
+                        </small>
+                        <span asp-validation-for="Input.Password" class="text-danger d-block"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.ConfirmPassword" class="form-label"></label>
+                        <input asp-for="Input.ConfirmPassword" class="form-control" type="password" />
+                        <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.Resume" class="form-label"></label>
+                        <input asp-for="Input.Resume" class="form-control" type="file" accept=".pdf,.docx" />
+                        <small class="text-muted">Accepted formats: PDF, DOCX (max 5MB)</small>
+                        <span asp-validation-for="Input.Resume" class="text-danger d-block"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Input.WhoAmI" class="form-label"></label>
+                        <textarea asp-for="Input.WhoAmI" class="form-control" rows="3" 
+                            placeholder="Tell us about yourself..."></textarea>
+                        <span asp-validation-for="Input.WhoAmI" class="text-danger"></span>
+                    </div>
+
+                    <input type="hidden" asp-for="Input.RecaptchaToken" id="recaptchaToken" />
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">Register</button>
+                    </div>
+
+                    <div class="text-center mt-3">
+                        <p>Already have an account? <a asp-page="/Login">Login here</a></p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/password-strength.js"></script>
+    @if (!string.IsNullOrEmpty(Model.RecaptchaSiteKey))
+    {
+        <script src="https://www.google.com/recaptcha/api.js?render=@Model.RecaptchaSiteKey"></script>
+        <script>
+            document.getElementById('registerForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                grecaptcha.ready(function() {
+                    grecaptcha.execute('@Model.RecaptchaSiteKey', {action: 'register'}).then(function(token) {
+                        document.getElementById('recaptchaToken').value = token;
+                        document.getElementById('registerForm').submit();
+                    });
+                });
+            });
+        </script>
+    }
+}

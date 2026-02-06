@@ -1,0 +1,149 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Welcome, @Model.CurrentUser?.FirstName @Model.CurrentUser?.LastName!</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Personal Information</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <th>Email:</th>
+                                <td>@Model.CurrentUser?.Email</td>
+                            </tr>
+                            <tr>
+                                <th>Gender:</th>
+                                <td>@Model.CurrentUser?.Gender</td>
+                            </tr>
+                            <tr>
+                                <th>NRIC:</th>
+                                <td>
+                                    <span class="badge bg-secondary" id="nricDisplay">****</span>
+                                    <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="toggleNRIC()">
+                                        Show/Hide
+                                    </button>
+                                    <span class="d-none" id="nricValue">@Model.DecryptedNRIC</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>Date of Birth:</th>
+                                <td>@Model.CurrentUser?.DateOfBirth.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Account Information</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <th>Member Since:</th>
+                                <td>@Model.CurrentUser?.CreatedAt.ToString("dd MMM yyyy")</td>
+                            </tr>
+                            <tr>
+                                <th>Last Password Change:</th>
+                                <td>@Model.CurrentUser?.LastPasswordChangeDate?.ToString("dd MMM yyyy HH:mm")</td>
+                            </tr>
+                            <tr>
+                                <th>Two-Factor Auth:</th>
+                                <td>
+                                    @if (Model.TwoFactorEnabled)
+                                    {
+                                        <span class="badge bg-success">Enabled</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-warning">Disabled</span>
+                                        <a asp-page="/TwoFactorSetup" class="btn btn-sm btn-outline-primary ms-2">Enable</a>
+                                    }
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrEmpty(Model.CurrentUser?.WhoAmI))
+                {
+                    <hr />
+                    <h5>About Me</h5>
+                    <p class="text-muted">@Model.CurrentUser.WhoAmI</p>
+                }
+
+                @if (!string.IsNullOrEmpty(Model.CurrentUser?.ResumePath))
+                {
+                    <hr />
+                    <h5>Resume</h5>
+                    <p><span class="badge bg-info">Resume uploaded</span></p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                @if (Model.RecentActivities.Any())
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var activity in Model.RecentActivities)
+                        {
+                            <li class="list-group-item">
+                                <div class="d-flex justify-content-between">
+                                    <strong>@activity.Action</strong>
+                                    <small class="text-muted">@activity.Timestamp.ToString("dd/MM HH:mm")</small>
+                                </div>
+                                @if (!string.IsNullOrEmpty(activity.Details))
+                                {
+                                    <small class="text-muted">@activity.Details</small>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted">No recent activity</p>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a asp-page="/ChangePassword" class="btn btn-outline-primary">Change Password</a>
+                    <a asp-page="/TwoFactorSetup" class="btn btn-outline-secondary">Manage 2FA</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function toggleNRIC() {
+            var display = document.getElementById('nricDisplay');
+            var value = document.getElementById('nricValue').textContent;
+            if (display.textContent === '****') {
+                display.textContent = value;
+                display.classList.remove('bg-secondary');
+                display.classList.add('bg-primary');
+            } else {
+                display.textContent = '****';
+                display.classList.remove('bg-primary');
+                display.classList.add('bg-secondary');
+            }
+        }
+    </script>
+}
