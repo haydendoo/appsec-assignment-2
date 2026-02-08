@@ -64,7 +64,11 @@ builder.Services.Configure<EmailOptions>(
     builder.Configuration.GetSection(EmailOptions.SectionName));
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
+builder.Services.Configure<BackupOptions>(
+    builder.Configuration.GetSection(BackupOptions.SectionName));
 builder.Services.AddScoped<EncryptionService>();
+builder.Services.AddScoped<DatabaseBackupService>();
+builder.Services.AddHostedService<BackupHostedService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<RecaptchaService>();
 builder.Services.AddHttpClient<RecaptchaService>();
@@ -75,14 +79,20 @@ builder.Services.AddAntiforgery(options =>
 {
     options.FormFieldName = "__RequestVerificationToken";
     options.HeaderName = "RequestVerificationToken";
-    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
-        ? CookieSecurePolicy.SameAsRequest
-        : CookieSecurePolicy.Always;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.SameSite = SameSiteMode.Strict;
     options.Cookie.HttpOnly = true;
 });
 
 var app = builder.Build();
+
+if (args.Contains("--backup"))
+{
+    using var scope = app.Services.CreateScope();
+    var backupService = scope.ServiceProvider.GetRequiredService<DatabaseBackupService>();
+    var (success, _) = await backupService.CreateBackupAsync();
+    Environment.Exit(success ? 0 : 1);
+}
 
 using (var scope = app.Services.CreateScope())
 {
@@ -99,11 +109,18 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseExceptionHandler("/Errors/500");
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
 
+app.Use(async (context, next) =>
+{
+    if (!context.Request.IsHttps)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+    await next();
+});
+
+app.UseHsts();
 app.UseHttpsRedirection();
 
 // Security headers

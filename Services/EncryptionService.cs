@@ -86,4 +86,48 @@ public class EncryptionService
             return null;
         }
     }
+
+    public byte[] EncryptBytes(byte[] plainBytes)
+    {
+        if (plainBytes == null || plainBytes.Length == 0)
+            return Array.Empty<byte>();
+
+        var iv = new byte[AesBlockSizeBytes];
+        RandomNumberGenerator.Fill(iv);
+
+        using var aes = Aes.Create();
+        aes.Key = _key;
+        aes.IV = iv;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+
+        using var encryptor = aes.CreateEncryptor();
+        var encryptedBytes = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
+
+        var payload = new byte[iv.Length + encryptedBytes.Length];
+        Buffer.BlockCopy(iv, 0, payload, 0, iv.Length);
+        Buffer.BlockCopy(encryptedBytes, 0, payload, iv.Length, encryptedBytes.Length);
+
+        return payload;
+    }
+
+    public byte[] DecryptBytes(byte[] payload)
+    {
+        if (payload == null || payload.Length < AesBlockSizeBytes)
+            throw new CryptographicException("Invalid cipher text format.");
+
+        var iv = new byte[AesBlockSizeBytes];
+        var encryptedBytes = new byte[payload.Length - AesBlockSizeBytes];
+        Buffer.BlockCopy(payload, 0, iv, 0, iv.Length);
+        Buffer.BlockCopy(payload, AesBlockSizeBytes, encryptedBytes, 0, encryptedBytes.Length);
+
+        using var aes = Aes.Create();
+        aes.Key = _key;
+        aes.IV = iv;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.PKCS7;
+
+        using var decryptor = aes.CreateDecryptor();
+        return decryptor.TransformFinalBlock(encryptedBytes, 0, encryptedBytes.Length);
+    }
 }

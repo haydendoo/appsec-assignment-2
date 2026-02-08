@@ -57,3 +57,4 @@ nunit-*.xml
 
 dataprotection-keys
 *.db*
+Backups/

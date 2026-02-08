@@ -15,8 +15,21 @@ public class AuditService
         _logger = logger;
     }
 
+    private static readonly HashSet<string> SecurityWarningActions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "LoginFailed", "AccountLocked", "2FAFailed"
+    };
+
     public async Task LogAsync(string? userId, string action, string? details, HttpContext? httpContext)
     {
+        var ipAddress = httpContext?.Connection.RemoteIpAddress?.ToString();
+        if (SecurityWarningActions.Contains(action))
+            _logger.LogWarning("Security event: {Action} | UserId: {UserId} | IpAddress: {IpAddress} | Details: {Details}",
+                action, userId ?? "(none)", ipAddress, details ?? "");
+        else
+            _logger.LogInformation("Security event: {Action} | UserId: {UserId} | IpAddress: {IpAddress} | Details: {Details}",
+                action, userId ?? "(none)", ipAddress, details ?? "");
+
         try
         {
             var auditLog = new AuditLog
@@ -24,7 +37,7 @@ public class AuditService
                 UserId = userId,
                 Action = action,
                 Details = details,
-                IpAddress = httpContext?.Connection.RemoteIpAddress?.ToString(),
+                IpAddress = ipAddress,
                 UserAgent = httpContext?.Request.Headers.UserAgent.ToString(),
                 Timestamp = DateTime.UtcNow
             };

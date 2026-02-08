@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using appsec_assignment_2.Data;
 using appsec_assignment_2.Models;
 using appsec_assignment_2.Services;
 
@@ -13,17 +14,20 @@ public class TwoFactorVerifyModel : PageModel
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly AuditService _auditService;
+    private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<TwoFactorVerifyModel> _logger;
 
     public TwoFactorVerifyModel(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         AuditService auditService,
+        ApplicationDbContext dbContext,
         ILogger<TwoFactorVerifyModel> logger)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _auditService = auditService;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
@@ -69,14 +73,16 @@ public class TwoFactorVerifyModel : PageModel
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null, bool rememberMe = false)
     {
+        returnUrl ??= Url.Content("~/");
+        ReturnUrl = returnUrl;
+        RememberMe = rememberMe;
+
         try
         {
             if (!ModelState.IsValid)
             {
                 return Page();
             }
-
-            returnUrl ??= Url.Content("~/");
 
             var user = await _signInManager.GetTwoFactorAuthenticationUserAsync();
             if (user == null)
@@ -98,11 +104,37 @@ public class TwoFactorVerifyModel : PageModel
 
             if (result.Succeeded)
             {
-                user.CurrentSessionId = Guid.NewGuid().ToString();
+                var authToken = Guid.NewGuid().ToString();
+                var sessionId = Guid.NewGuid().ToString();
+
+                HttpContext.Session.SetString("AuthToken", authToken);
+                HttpContext.Session.SetString("SessionId", sessionId);
+
+                Response.Cookies.Append("AuthToken", authToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = rememberMe ? DateTimeOffset.UtcNow.AddDays(30) : null
+                });
+
+                var userSession = new UserSession
+                {
+                    UserId = user.Id,
+                    SessionId = sessionId,
+                    AuthToken = authToken,
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    UserAgent = HttpContext.Request.Headers.UserAgent.ToString(),
+                    CreatedAt = DateTime.UtcNow,
+                    LastActivityAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+                _dbContext.UserSessions.Add(userSession);
+                await _dbContext.SaveChangesAsync();
+
+                user.CurrentSessionId = sessionId;
                 user.UpdatedAt = DateTime.UtcNow;
                 await _userManager.UpdateAsync(user);
-
-                HttpContext.Session.SetString("SessionId", user.CurrentSessionId);
 
                 await _auditService.LogAsync(user.Id, "2FAVerified", "Two-factor authentication verified", HttpContext);
 

@@ -22,7 +22,7 @@
 - [x] Implement proper login functionality
 - [x] Implement rate limiting (e.g., account lockout after 3 failed login attempts)
 - [x] Perform proper and safe logout (clear session and redirect to login page)
-- [ ] Implement audit logging (save user activities in the database)
+- [x] Implement audit logging (save user activities in the database)
 - [x] Redirect to homepage after successful login, displaying user info
 
 ## Anti-Bot Protection
@@ -47,19 +47,19 @@
 
 ## Advanced Security Features
 - [x] Implement automatic account recovery after lockout period
-- [ ] Enforce password history (avoid password reuse, max 2 password history)
-- [ ] Implement change password functionality
-- [ ] Implement reset password functionality (using email link or SMS)
-- [ ] Enforce minimum and maximum password age policies
-- [ ] Implement Two-Factor Authentication (2FA)
+- [x] Enforce password history (avoid password reuse, max 2 password history)
+- [x] Implement change password functionality
+- [x] Implement reset password functionality (using email link or SMS)
+- [x] Enforce minimum and maximum password age policies
+- [x] Implement Two-Factor Authentication (2FA)
 
 ## General Security Best Practices
-- [ ] Use HTTPS for all communications
+- [x] Use HTTPS for all communications
 - [x] Implement proper access controls and authorization
 - [x] Keep all software and dependencies up to date
 - [x] Follow secure coding practices
 - [ ] Regularly backup and securely store user data
-- [ ] Implement logging and monitoring for security events
+- [x] Implement logging and monitoring for security events
 
 ## Documentation and Reporting
 - [x] Prepare a report on implemented security features

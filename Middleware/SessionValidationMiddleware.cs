@@ -55,6 +55,27 @@ public class SessionValidationMiddleware
 
                     dbSession.LastActivityAt = DateTime.UtcNow;
                     await dbContext.SaveChangesAsync();
+
+                    if (user.MustChangePassword)
+                    {
+                        var path = context.Request.Path.Value ?? "";
+                        var isStaticAsset = path.StartsWith("/css/", StringComparison.OrdinalIgnoreCase)
+                            || path.StartsWith("/js/", StringComparison.OrdinalIgnoreCase)
+                            || path.StartsWith("/lib/", StringComparison.OrdinalIgnoreCase)
+                            || path.StartsWith("/favicon.ico", StringComparison.OrdinalIgnoreCase)
+                            || path.EndsWith(".css", StringComparison.OrdinalIgnoreCase)
+                            || path.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+                            || path.EndsWith(".map", StringComparison.OrdinalIgnoreCase)
+                            || path.EndsWith(".ico", StringComparison.OrdinalIgnoreCase);
+                        var allowedWhenMustChange = path.StartsWith("/ChangePassword", StringComparison.OrdinalIgnoreCase)
+                            || path.StartsWith("/Logout", StringComparison.OrdinalIgnoreCase)
+                            || isStaticAsset;
+                        if (!allowedWhenMustChange)
+                        {
+                            context.Response.Redirect("/ChangePassword?mustChange=true");
+                            return;
+                        }
+                    }
                 }
             }
 

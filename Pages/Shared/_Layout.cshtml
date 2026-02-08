@@ -23,9 +23,6 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
-                        </li>
                     </ul>
                     <ul class="navbar-nav">
                         @if (User.Identity?.IsAuthenticated == true)
@@ -35,6 +32,9 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link text-dark" asp-page="/TwoFactorSetup">2FA Setup</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-page="/Backup/Index">Backup</a>
                             </li>
                             <li class="nav-item">
                                 <form method="post" asp-page="/Logout" class="d-inline">
@@ -64,7 +64,7 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2026 - Ace Job Agency - <a asp-area="" asp-page="/Privacy">Privacy</a>
+            &copy; 2026 - Ace Job Agency
         </div>
     </footer>
 

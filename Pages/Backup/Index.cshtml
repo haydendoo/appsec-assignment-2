@@ -1,0 +1,67 @@
+@page
+@model appsec_assignment_2.Pages.Backup.IndexModel
+@{
+    ViewData["Title"] = "Database backup";
+}
+
+<div class="row">
+    <div class="col">
+        <h2>Database backup</h2>
+
+        @if (Model.Message != null)
+        {
+            <div class="alert @(Model.BackupSuccess == true ? "alert-success" : Model.BackupSuccess == false ? "alert-danger" : "alert-info") alert-dismissible fade show" role="alert">
+                @Model.Message
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <p class="mb-2">Create an encrypted backup of the database now. Backups are stored on disk encrypted and are decrypted when you download.</p>
+                <form method="post">
+                    <button type="submit" class="btn btn-primary">Run backup now</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Available backups</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.Backups.Count == 0)
+                {
+                    <p class="text-muted mb-0">No backups yet. Run a backup above to create one.</p>
+                }
+                else
+                {
+                    <p class="text-muted small mb-3">Download returns the database decrypted (as a .db file).</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>File</th>
+                                    <th>Created (UTC)</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var b in Model.Backups)
+                                {
+                                    <tr>
+                                        <td>@b.FileName</td>
+                                        <td>@b.CreatedUtc.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                        <td>
+                                            <a asp-page="/Backup/Index" asp-page-handler="Download" asp-route-file="@b.FileName" class="btn btn-sm btn-outline-primary">Download</a>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>

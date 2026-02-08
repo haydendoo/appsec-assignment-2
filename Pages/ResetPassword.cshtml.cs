@@ -124,12 +124,14 @@ public class ResetPasswordModel : PageModel
             foreach (var error in result.Errors)
                 ModelState.AddModelError(string.Empty, error.Description);
 
+            Response.StatusCode = StatusCodes.Status200OK;
             return Page();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ResetPassword OnPost failed");
             ModelState.AddModelError(string.Empty, "An error occurred. Please try again.");
+            Response.StatusCode = StatusCodes.Status200OK;
             return Page();
         }
     }
