@@ -19,7 +19,7 @@
         <div class="card mb-4">
             <div class="card-body">
                 <p class="mb-2">Create an encrypted backup of the database now. Backups are stored on disk encrypted and are decrypted when you download.</p>
-                <form method="post">
+                <form method="post" asp-page-handler="RunBackup">
                     <button type="submit" class="btn btn-primary">Run backup now</button>
                 </form>
             </div>

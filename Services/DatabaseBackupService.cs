@@ -134,7 +134,7 @@ public class DatabaseBackupService
     private async Task<byte[]> CreateBackupViaSqliteApiAsync(string connectionString, string dbPath, string tempPath, CancellationToken cancellationToken)
     {
         var sourceCs = new SqliteConnectionStringBuilder(connectionString) { DataSource = dbPath }.ToString();
-        var destCs = new SqliteConnectionStringBuilder { DataSource = tempPath }.ToString();
+        var destCs = new SqliteConnectionStringBuilder { DataSource = tempPath, Pooling = false }.ToString();
 
         await using (var source = new SqliteConnection(sourceCs))
         await using (var dest = new SqliteConnection(destCs))
@@ -144,24 +144,7 @@ public class DatabaseBackupService
             source.BackupDatabase(dest);
         }
 
-        const int maxAttempts = 15;
-        IOException? lastException = null;
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            try
-            {
-                return await File.ReadAllBytesAsync(tempPath, cancellationToken);
-            }
-            catch (IOException ex)
-            {
-                lastException = ex;
-                if (attempt == maxAttempts)
-                    throw;
-                await Task.Delay(80 * attempt, cancellationToken);
-            }
-        }
-
-        throw lastException!;
+        return await File.ReadAllBytesAsync(tempPath, cancellationToken);
     }
 
     private string ResolveDatabasePath(string connectionString)
