@@ -196,8 +196,8 @@ public class LoginModel : PageModel
         }
         else
         {
-            var sanitizedEmail = string.IsNullOrEmpty(Input.Email) ? "" : string.Join("", Input.Email.Where(c => c != '\r' && c != '\n').Take(256));
-            await _auditService.LogAsync(null, "LoginFailed", $"Unknown user: {sanitizedEmail}", HttpContext);
+            // Do not log the provided email address to avoid exposing potentially private information
+            await _auditService.LogAsync(null, "LoginFailed", "Unknown user login attempt", HttpContext);
         }
 
             ModelState.AddModelError(string.Empty, "Invalid login attempt.");
