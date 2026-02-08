@@ -60,7 +60,10 @@ builder.Services.AddSession(options =>
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
-// Add custom services
+builder.Services.Configure<EmailOptions>(
+    builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+
 builder.Services.AddScoped<EncryptionService>();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<RecaptchaService>();
