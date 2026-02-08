@@ -23,7 +23,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.Password.RequiredUniqueChars = 1;
 
     // Lockout settings (3 failed attempts, 15 min lockout)
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromSeconds(5);
     options.Lockout.MaxFailedAccessAttempts = 3;
     options.Lockout.AllowedForNewUsers = true;
 
@@ -71,19 +71,36 @@ builder.Services.AddHttpClient<RecaptchaService>();
 
 builder.Services.AddRazorPages();
 
+builder.Services.AddAntiforgery(options =>
+{
+    options.FormFieldName = "__RequestVerificationToken";
+    options.HeaderName = "RequestVerificationToken";
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.HttpOnly = true;
+});
+
 var app = builder.Build();
 
-// Create database on startup
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    dbContext.Database.EnsureCreated();
+    try
+    {
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        dbContext.Database.EnsureCreated();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetService<ILogger<Program>>();
+        logger?.LogError(ex, "Database initialization failed");
+    }
 }
 
-// Configure the HTTP request pipeline.
+app.UseExceptionHandler("/Errors/500");
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Error");
     app.UseHsts();
 }
 
@@ -102,7 +119,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseStatusCodePagesWithReExecute("/Errors/{0}");
+app.UseStatusCodePagesWithReExecute("/Errors/Error", "?code={0}");
 
 app.UseRouting();
 

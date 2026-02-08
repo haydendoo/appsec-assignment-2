@@ -60,7 +60,7 @@
                         <div class="mb-3">
                             <label class="form-label">Verification Code</label>
                             <input asp-for="VerificationCode" class="form-control text-center fs-4" 
-                                placeholder="Enter 6-digit code" maxlength="6" />
+                                placeholder="Enter 6-digit code" maxlength="8" autocomplete="off" />
                             <span asp-validation-for="VerificationCode" class="text-danger"></span>
                             <small class="text-muted">Enter the 6-digit code from your authenticator app</small>
                         </div>

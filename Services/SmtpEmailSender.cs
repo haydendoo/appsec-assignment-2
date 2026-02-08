@@ -23,20 +23,27 @@ public class SmtpEmailSender : IEmailSender
             return;
         }
 
-        using var client = new SmtpClient(_options.Host, _options.Port)
+        try
         {
-            EnableSsl = _options.EnableSsl,
-            Credentials = new NetworkCredential(_options.FromAddress, _options.AppPassword)
-        };
+            using var client = new SmtpClient(_options.Host, _options.Port)
+            {
+                EnableSsl = _options.EnableSsl,
+                Credentials = new NetworkCredential(_options.FromAddress, _options.AppPassword)
+            };
 
-        var message = new MailMessage(_options.FromAddress, to, subject, body)
+            var message = new MailMessage(_options.FromAddress, to, subject, body)
+            {
+                From = new MailAddress(_options.FromAddress, _options.FromName),
+                IsBodyHtml = true
+            };
+
+            await client.SendMailAsync(message, cancellationToken);
+            _logger.LogInformation("Email sent to {To}", to);
+        }
+        catch (Exception ex)
         {
-            From = new MailAddress(_options.FromAddress, _options.FromName),
-            IsBodyHtml = true
-        };
-
-        await client.SendMailAsync(message, cancellationToken);
-        _logger.LogInformation("Email sent to {To}", to);
+            _logger.LogError(ex, "Failed to send email to {To}", to);
+        }
     }
 }
 

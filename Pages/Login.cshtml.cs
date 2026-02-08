@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using appsec_assignment_2.Data;
 using appsec_assignment_2.Models;
 using appsec_assignment_2.Services;
 using appsec_assignment_2.ViewModels;
 
 namespace appsec_assignment_2.Pages;
 
+[ValidateAntiForgeryToken]
 public class LoginModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -14,19 +16,25 @@ public class LoginModel : PageModel
     private readonly AuditService _auditService;
     private readonly RecaptchaService _recaptchaService;
     private readonly IConfiguration _configuration;
+    private readonly ApplicationDbContext _dbContext;
+    private readonly ILogger<LoginModel> _logger;
 
     public LoginModel(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         AuditService auditService,
         RecaptchaService recaptchaService,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ApplicationDbContext dbContext,
+        ILogger<LoginModel> logger)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _auditService = auditService;
         _recaptchaService = recaptchaService;
         _configuration = configuration;
+        _dbContext = dbContext;
+        _logger = logger;
     }
 
     [BindProperty]
@@ -41,22 +49,32 @@ public class LoginModel : PageModel
 
     public string? LockoutMessage { get; set; }
 
-    public void OnGet(string? returnUrl = null)
+    public IActionResult OnGet(string? returnUrl = null)
     {
-        ReturnUrl = returnUrl ?? Url.Content("~/");
+        try
+        {
+            ReturnUrl = returnUrl ?? Url.Content("~/");
+            return Page();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Login OnGet failed");
+            return RedirectToPage("/Error");
+        }
     }
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
         returnUrl ??= Url.Content("~/");
 
-        if (!ModelState.IsValid)
+        try
         {
-            return Page();
-        }
+            if (!ModelState.IsValid)
+            {
+                return Page();
+            }
 
-        // Verify reCAPTCHA
-        if (!string.IsNullOrEmpty(RecaptchaSiteKey))
+            if (!string.IsNullOrEmpty(RecaptchaSiteKey))
         {
             var recaptchaResult = await _recaptchaService.VerifyAsync(Input.RecaptchaToken ?? string.Empty);
             if (!recaptchaResult.Success || recaptchaResult.Score < 0.5)
@@ -104,20 +122,47 @@ public class LoginModel : PageModel
 
         if (result.Succeeded)
         {
-            // Update session ID for single session enforcement
             user = await _userManager.FindByEmailAsync(Input.Email);
             if (user != null)
             {
-                user.CurrentSessionId = Guid.NewGuid().ToString();
+                // Generate AuthToken GUID for session fixation protection
+                var authToken = Guid.NewGuid().ToString();
+                var sessionId = Guid.NewGuid().ToString();
+                
+                // Store AuthToken in server-side session
+                HttpContext.Session.SetString("AuthToken", authToken);
+                HttpContext.Session.SetString("SessionId", sessionId);
+                
+                // Store AuthToken in cookie (HttpOnly, Secure)
+                Response.Cookies.Append("AuthToken", authToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = Input.RememberMe ? DateTimeOffset.UtcNow.AddDays(30) : null
+                });
+
+                // Create session record in database for multi-session tracking
+                var userSession = new UserSession
+                {
+                    UserId = user.Id,
+                    SessionId = sessionId,
+                    AuthToken = authToken,
+                    IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                    UserAgent = HttpContext.Request.Headers.UserAgent.ToString(),
+                    CreatedAt = DateTime.UtcNow,
+                    LastActivityAt = DateTime.UtcNow,
+                    IsActive = true
+                };
+                _dbContext.UserSessions.Add(userSession);
+                await _dbContext.SaveChangesAsync();
+
+                user.CurrentSessionId = sessionId;
                 user.UpdatedAt = DateTime.UtcNow;
                 await _userManager.UpdateAsync(user);
 
-                // Store session ID in session
-                HttpContext.Session.SetString("SessionId", user.CurrentSessionId);
-
                 await _auditService.LogAsync(user.Id, "LoginSuccess", "User logged in successfully", HttpContext);
 
-                // Check if must change password
                 if (user.MustChangePassword)
                 {
                     return RedirectToPage("/ChangePassword", new { mustChange = true });
@@ -151,10 +196,18 @@ public class LoginModel : PageModel
         }
         else
         {
-            await _auditService.LogAsync(null, "LoginFailed", $"Unknown user: {Input.Email}", HttpContext);
+            var sanitizedEmail = string.IsNullOrEmpty(Input.Email) ? "" : string.Join("", Input.Email.Where(c => c != '\r' && c != '\n').Take(256));
+            await _auditService.LogAsync(null, "LoginFailed", $"Unknown user: {sanitizedEmail}", HttpContext);
         }
 
-        ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-        return Page();
+            ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+            return Page();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Login OnPost failed");
+            ModelState.AddModelError(string.Empty, "An error occurred. Please try again.");
+            return Page();
+        }
     }
 }

@@ -13,6 +13,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<PasswordHistory> PasswordHistories => Set<PasswordHistory>();
+    public DbSet<UserSession> UserSessions => Set<UserSession>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -31,6 +32,17 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<PasswordHistory>(entity =>
         {
             entity.HasIndex(e => e.UserId);
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<UserSession>(entity =>
+        {
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.SessionId);
+            entity.HasIndex(e => e.AuthToken);
             entity.HasOne(e => e.User)
                 .WithMany()
                 .HasForeignKey(e => e.UserId)

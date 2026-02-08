@@ -5,21 +5,16 @@ namespace appsec_assignment_2.Services;
 
 public class EncryptionService
 {
+    private const int AesBlockSizeBytes = 16;
     private readonly byte[] _key;
-    private readonly byte[] _iv;
 
     public EncryptionService(IConfiguration configuration)
     {
-        var keyString = configuration["Encryption:Key"] 
+        var keyString = configuration["Encryption:Key"]
             ?? throw new InvalidOperationException("Encryption key not configured");
-        
-        // Derive a 256-bit key from the configured key using SHA256
+
         using var sha256 = SHA256.Create();
         _key = sha256.ComputeHash(Encoding.UTF8.GetBytes(keyString));
-        
-        // Use first 16 bytes for IV (in production, generate and store IV per encryption)
-        _iv = new byte[16];
-        Array.Copy(_key, _iv, 16);
     }
 
     public string Encrypt(string plainText)
@@ -27,17 +22,24 @@ public class EncryptionService
         if (string.IsNullOrEmpty(plainText))
             return string.Empty;
 
+        var iv = new byte[AesBlockSizeBytes];
+        RandomNumberGenerator.Fill(iv);
+
         using var aes = Aes.Create();
         aes.Key = _key;
-        aes.IV = _iv;
+        aes.IV = iv;
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.PKCS7;
 
         using var encryptor = aes.CreateEncryptor();
         var plainBytes = Encoding.UTF8.GetBytes(plainText);
         var encryptedBytes = encryptor.TransformFinalBlock(plainBytes, 0, plainBytes.Length);
-        
-        return Convert.ToBase64String(encryptedBytes);
+
+        var payload = new byte[iv.Length + encryptedBytes.Length];
+        Buffer.BlockCopy(iv, 0, payload, 0, iv.Length);
+        Buffer.BlockCopy(encryptedBytes, 0, payload, iv.Length, encryptedBytes.Length);
+
+        return Convert.ToBase64String(payload);
     }
 
     public string Decrypt(string cipherText)
@@ -45,16 +47,43 @@ public class EncryptionService
         if (string.IsNullOrEmpty(cipherText))
             return string.Empty;
 
+        var payload = Convert.FromBase64String(cipherText);
+        if (payload.Length < AesBlockSizeBytes)
+            throw new CryptographicException("Invalid cipher text format.");
+
+        var iv = new byte[AesBlockSizeBytes];
+        var encryptedBytes = new byte[payload.Length - AesBlockSizeBytes];
+        Buffer.BlockCopy(payload, 0, iv, 0, iv.Length);
+        Buffer.BlockCopy(payload, AesBlockSizeBytes, encryptedBytes, 0, encryptedBytes.Length);
+
         using var aes = Aes.Create();
         aes.Key = _key;
-        aes.IV = _iv;
+        aes.IV = iv;
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.PKCS7;
 
         using var decryptor = aes.CreateDecryptor();
-        var cipherBytes = Convert.FromBase64String(cipherText);
-        var decryptedBytes = decryptor.TransformFinalBlock(cipherBytes, 0, cipherBytes.Length);
-        
+        var decryptedBytes = decryptor.TransformFinalBlock(encryptedBytes, 0, encryptedBytes.Length);
+
         return Encoding.UTF8.GetString(decryptedBytes);
+    }
+
+    public string? TryDecrypt(string? cipherText)
+    {
+        if (string.IsNullOrEmpty(cipherText))
+            return string.Empty;
+
+        try
+        {
+            return Decrypt(cipherText);
+        }
+        catch (CryptographicException)
+        {
+            return null;
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 }

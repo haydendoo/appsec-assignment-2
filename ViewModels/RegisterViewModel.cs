@@ -15,6 +15,7 @@ public class RegisterViewModel
     public string LastName { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Gender is required")]
+    [RegularExpression(@"^(Male|Female|Other)$", ErrorMessage = "Invalid gender selection")]
     [Display(Name = "Gender")]
     public string Gender { get; set; } = string.Empty;
 
@@ -25,6 +26,7 @@ public class RegisterViewModel
 
     [Required(ErrorMessage = "Email is required")]
     [EmailAddress(ErrorMessage = "Invalid email address")]
+    [StringLength(256)]
     [Display(Name = "Email")]
     public string Email { get; set; } = string.Empty;
 

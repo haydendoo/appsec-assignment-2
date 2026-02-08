@@ -9,6 +9,7 @@ using appsec_assignment_2.ViewModels;
 
 namespace appsec_assignment_2.Pages;
 
+[ValidateAntiForgeryToken]
 public class RegisterModel : PageModel
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -18,6 +19,7 @@ public class RegisterModel : PageModel
     private readonly IWebHostEnvironment _environment;
     private readonly IConfiguration _configuration;
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<RegisterModel> _logger;
 
     public RegisterModel(
         UserManager<ApplicationUser> userManager,
@@ -26,7 +28,8 @@ public class RegisterModel : PageModel
         RecaptchaService recaptchaService,
         IWebHostEnvironment environment,
         IConfiguration configuration,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        ILogger<RegisterModel> logger)
     {
         _userManager = userManager;
         _encryptionService = encryptionService;
@@ -35,6 +38,7 @@ public class RegisterModel : PageModel
         _environment = environment;
         _configuration = configuration;
         _context = context;
+        _logger = logger;
     }
 
     [BindProperty]
@@ -42,19 +46,30 @@ public class RegisterModel : PageModel
 
     public string? RecaptchaSiteKey => _configuration["Recaptcha:SiteKey"];
 
-    public void OnGet()
+    public IActionResult OnGet()
     {
+        try
+        {
+            Input.DateOfBirth = DateTime.Today;
+            return Page();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Register OnGet failed");
+            return RedirectToPage("/Error");
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!ModelState.IsValid)
+        try
         {
-            return Page();
-        }
+            if (!ModelState.IsValid)
+            {
+                return Page();
+            }
 
-        // Verify reCAPTCHA
-        if (!string.IsNullOrEmpty(RecaptchaSiteKey))
+            if (!string.IsNullOrEmpty(RecaptchaSiteKey))
         {
             var recaptchaResult = await _recaptchaService.VerifyAsync(Input.RecaptchaToken ?? string.Empty);
             if (!recaptchaResult.Success || recaptchaResult.Score < 0.5)
@@ -123,23 +138,40 @@ public class RegisterModel : PageModel
             return RedirectToPage("/Login");
         }
 
-        foreach (var error in result.Errors)
-        {
-            ModelState.AddModelError(string.Empty, error.Description);
-        }
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
 
-        return Page();
+            return Page();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Register OnPost failed");
+            ModelState.AddModelError(string.Empty, "An error occurred. Please try again.");
+            return Page();
+        }
     }
+
+    private static readonly string[] AllowedResumeMimeTypes =
+    {
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    };
 
     private (bool IsValid, string? ErrorMessage) ValidateResumeFile(IFormFile file)
     {
-        // Check file size (max 5MB)
         if (file.Length > 5 * 1024 * 1024)
         {
             return (false, "Resume file size cannot exceed 5MB.");
         }
 
-        // Check extension
+        var contentType = (file.ContentType ?? string.Empty).Split(';')[0].Trim();
+        if (string.IsNullOrEmpty(contentType) || !AllowedResumeMimeTypes.Contains(contentType, StringComparer.OrdinalIgnoreCase))
+        {
+            return (false, "Invalid file type. Only PDF and DOCX are allowed.");
+        }
+
         var allowedExtensions = new[] { ".pdf", ".docx" };
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!allowedExtensions.Contains(extension))
@@ -151,9 +183,10 @@ public class RegisterModel : PageModel
         using var reader = new BinaryReader(file.OpenReadStream());
         var headerBytes = reader.ReadBytes(8);
 
-        bool isValidPdf = headerBytes.Length >= 4 && 
+        bool isValidPdf = headerBytes.Length >= 5 && 
             headerBytes[0] == 0x25 && headerBytes[1] == 0x50 && 
-            headerBytes[2] == 0x44 && headerBytes[3] == 0x46; // %PDF
+            headerBytes[2] == 0x44 && headerBytes[3] == 0x46 &&
+            headerBytes[4] == 0x2D; // %PDF-
 
         bool isValidDocx = headerBytes.Length >= 4 && 
             headerBytes[0] == 0x50 && headerBytes[1] == 0x4B && 

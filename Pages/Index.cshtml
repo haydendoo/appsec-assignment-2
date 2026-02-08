@@ -75,12 +75,30 @@
                     <p class="text-muted">@Model.CurrentUser.WhoAmI</p>
                 }
 
+                <hr />
+                <h5>Resume</h5>
                 @if (!string.IsNullOrEmpty(Model.CurrentUser?.ResumePath))
                 {
-                    <hr />
-                    <h5>Resume</h5>
-                    <p><span class="badge bg-info">Resume uploaded</span></p>
+                    <p class="mb-2">
+                        <span class="badge bg-info">Resume uploaded</span>
+                        <a asp-page="/Index" asp-page-handler="DownloadResume" class="btn btn-sm btn-outline-primary ms-2">
+                            Download resume
+                        </a>
+                    </p>
                 }
+                <form method="post" asp-page-handler="UploadResume" enctype="multipart/form-data" class="mb-0" id="uploadResumeForm">
+                    <div asp-validation-summary="All" class="text-danger mb-2"></div>
+                    @if (TempData["ResumeUploadSuccess"] != null)
+                    {
+                        <p class="text-success mb-2">@TempData["ResumeUploadSuccess"]</p>
+                    }
+                    <div class="input-group">
+                        <input asp-for="UploadedResume" type="file" class="form-control" accept=".pdf,.docx" id="uploadResumeInput" />
+                        <button type="submit" class="btn btn-primary">@(string.IsNullOrEmpty(Model.CurrentUser?.ResumePath) ? "Upload resume" : "Replace resume")</button>
+                    </div>
+                    <small class="text-muted">PDF or DOCX, max 5MB</small>
+                    <div id="resumeUploadError" class="text-danger small mt-1 d-none"></div>
+                </form>
             </div>
         </div>
     </div>
@@ -117,6 +135,87 @@
         </div>
 
         <div class="card shadow mt-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">Recent logins</h5>
+            </div>
+            <div class="card-body" style="max-height: 320px; overflow-y: auto;">
+                @if (Model.RecentLogins.Any())
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var login in Model.RecentLogins)
+                        {
+                            <li class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <span class="fw-medium">@IndexModel.GetDeviceDescription(login.UserAgent)</span>
+                                        @if (!string.IsNullOrEmpty(login.IpAddress))
+                                        {
+                                            <br /><small class="text-muted">IP Address: @login.IpAddress</small>
+                                        }
+                                    </div>
+                                    <small class="text-muted text-nowrap">@login.Timestamp.ToString("dd/MM/yy HH:mm")</small>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No login history yet</p>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow mt-4">
+            <div class="card-header @(Model.ActiveSessions.Count > 1 ? "bg-warning" : "bg-info") text-white">
+                <h5 class="mb-0">
+                    Active Sessions
+                    @if (Model.ActiveSessions.Count > 1)
+                    {
+                        <span class="badge bg-dark ms-2">@Model.ActiveSessions.Count devices</span>
+                    }
+                </h5>
+            </div>
+            <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                @if (Model.ActiveSessions.Count > 1)
+                {
+                    <div class="alert alert-warning py-2 mb-3">
+                        <small><strong>Notice:</strong> Your account is logged in on multiple devices/browsers.</small>
+                    </div>
+                }
+                @if (Model.ActiveSessions.Any())
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var session in Model.ActiveSessions)
+                        {
+                            var isCurrentSession = session.SessionId == Model.CurrentSessionId;
+                            <li class="list-group-item px-0 @(isCurrentSession ? "bg-light border-start border-primary border-3" : "")">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="ps-2">
+                                        <span class="fw-medium">@IndexModel.GetDeviceDescription(session.UserAgent)</span>
+                                        @if (isCurrentSession)
+                                        {
+                                            <span class="badge bg-primary ms-1">Current</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(session.IpAddress))
+                                        {
+                                            <br /><small class="text-muted">IP Address: @session.IpAddress</small>
+                                        }
+                                        <br /><small class="text-muted">Last active: @session.LastActivityAt.ToString("dd/MM/yy HH:mm")</small>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p class="text-muted mb-0">No active sessions</p>
+                }
+            </div>
+        </div>
+
+        <div class="card shadow mt-4">
             <div class="card-header">
                 <h5 class="mb-0">Quick Actions</h5>
             </div>
@@ -145,5 +244,43 @@
                 display.classList.add('bg-secondary');
             }
         }
+
+        (function () {
+            var form = document.getElementById('uploadResumeForm');
+            var input = document.getElementById('uploadResumeInput');
+            var errorEl = document.getElementById('resumeUploadError');
+            if (!form || !input) return;
+
+            var maxSizeBytes = 5 * 1024 * 1024;
+            var allowedExtensions = ['.pdf', '.docx'];
+
+            form.addEventListener('submit', function (e) {
+                var file = input.files && input.files[0];
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+
+                if (!file) {
+                    e.preventDefault();
+                    errorEl.textContent = 'Please select a file to upload.';
+                    errorEl.classList.remove('d-none');
+                    return;
+                }
+
+                var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                if (allowedExtensions.indexOf(ext) === -1) {
+                    e.preventDefault();
+                    errorEl.textContent = 'Only PDF and DOCX files are allowed.';
+                    errorEl.classList.remove('d-none');
+                    return;
+                }
+
+                if (file.size > maxSizeBytes) {
+                    e.preventDefault();
+                    errorEl.textContent = 'File size cannot exceed 5MB.';
+                    errorEl.classList.remove('d-none');
+                    return;
+                }
+            });
+        })();
     </script>
 }

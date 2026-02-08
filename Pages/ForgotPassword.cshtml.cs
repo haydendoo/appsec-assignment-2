@@ -7,6 +7,7 @@ using appsec_assignment_2.Services;
 
 namespace appsec_assignment_2.Pages;
 
+[ValidateAntiForgeryToken]
 public class ForgotPasswordModel : PageModel
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -35,45 +36,55 @@ public class ForgotPasswordModel : PageModel
     {
         [Required(ErrorMessage = "Email is required")]
         [EmailAddress(ErrorMessage = "Invalid email address")]
+        [StringLength(256)]
         public string Email { get; set; } = string.Empty;
     }
 
-    public void OnGet()
+    public IActionResult OnGet()
     {
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!ModelState.IsValid)
+        try
         {
+            if (!ModelState.IsValid)
+            {
+                return Page();
+            }
+
+            var user = await _userManager.FindByEmailAsync(Input.Email);
+
+            if (user != null)
+            {
+                var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+                var callbackUrl = Url.Page(
+                    "/ResetPassword",
+                    pageHandler: null,
+                    values: new { token, email = Input.Email },
+                    protocol: Request.Scheme);
+
+                var subject = "Reset your password";
+                var body = $"""
+                    <p>You requested a password reset. Click the link below to reset your password:</p>
+                    <p><a href="{callbackUrl}">Reset password</a></p>
+                    <p>If you did not request this, you can ignore this email.</p>
+                    <p>This link will expire in 1 hour.</p>
+                    """;
+                await _emailSender.SendEmailAsync(Input.Email, subject, body);
+
+                await _auditService.LogAsync(user.Id, "PasswordResetRequested", "Password reset link generated", HttpContext);
+            }
+
+            EmailSent = true;
             return Page();
         }
-
-        var user = await _userManager.FindByEmailAsync(Input.Email);
-        
-        if (user != null)
+        catch (Exception ex)
         {
-            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-            var callbackUrl = Url.Page(
-                "/ResetPassword",
-                pageHandler: null,
-                values: new { token, email = Input.Email },
-                protocol: Request.Scheme);
-
-            var subject = "Reset your password";
-            var body = $"""
-                <p>You requested a password reset. Click the link below to reset your password:</p>
-                <p><a href="{callbackUrl}">Reset password</a></p>
-                <p>If you did not request this, you can ignore this email.</p>
-                <p>This link will expire in 1 hour.</p>
-                """;
-            await _emailSender.SendEmailAsync(Input.Email, subject, body);
-
-            await _auditService.LogAsync(user.Id, "PasswordResetRequested", "Password reset link generated", HttpContext);
+            _logger.LogError(ex, "ForgotPassword OnPost failed");
+            ModelState.AddModelError(string.Empty, "An error occurred. Please try again.");
+            return Page();
         }
-
-        // Always show success to prevent email enumeration
-        EmailSent = true;
-        return Page();
     }
 }

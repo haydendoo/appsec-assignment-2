@@ -10,6 +10,7 @@ using appsec_assignment_2.ViewModels;
 namespace appsec_assignment_2.Pages;
 
 [Authorize]
+[ValidateAntiForgeryToken]
 public class ChangePasswordModel : PageModel
 {
     private readonly UserManager<ApplicationUser> _userManager;
@@ -17,19 +18,22 @@ public class ChangePasswordModel : PageModel
     private readonly AuditService _auditService;
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<ChangePasswordModel> _logger;
 
     public ChangePasswordModel(
         UserManager<ApplicationUser> userManager,
         SignInManager<ApplicationUser> signInManager,
         AuditService auditService,
         ApplicationDbContext context,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogger<ChangePasswordModel> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _auditService = auditService;
         _context = context;
         _configuration = configuration;
+        _logger = logger;
     }
 
     [BindProperty]
@@ -39,71 +43,86 @@ public class ChangePasswordModel : PageModel
 
     public string? MinAgeMessage { get; set; }
 
-    public void OnGet(bool mustChange = false)
+    public IActionResult OnGet(bool mustChange = false)
     {
-        MustChangePassword = mustChange;
+        try
+        {
+            MustChangePassword = mustChange;
+            return Page();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ChangePassword OnGet failed");
+            return RedirectToPage("/Error");
+        }
     }
 
     public async Task<IActionResult> OnPostAsync()
     {
-        if (!ModelState.IsValid)
+        try
         {
-            return Page();
-        }
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-        {
-            return RedirectToPage("/Login");
-        }
-
-        // Check minimum password age
-        var minAgeMinutes = _configuration.GetValue<int>("PasswordPolicy:MinimumAgeMinutes", 1);
-        if (user.LastPasswordChangeDate.HasValue)
-        {
-            var timeSinceChange = DateTime.UtcNow - user.LastPasswordChangeDate.Value;
-            if (timeSinceChange.TotalMinutes < minAgeMinutes)
+            if (!ModelState.IsValid)
             {
-                var remainingMinutes = minAgeMinutes - (int)timeSinceChange.TotalMinutes;
-                ModelState.AddModelError(string.Empty, 
-                    $"Cannot change password yet. Please wait {remainingMinutes} more minute(s).");
                 return Page();
             }
-        }
 
-        var result = await _userManager.ChangePasswordAsync(user, Input.CurrentPassword, Input.NewPassword);
-
-        if (result.Succeeded)
-        {
-            // Save to password history
-            var passwordHistory = new PasswordHistory
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
             {
-                UserId = user.Id,
-                PasswordHash = user.PasswordHash!,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.PasswordHistories.Add(passwordHistory);
+                return RedirectToPage("/Login");
+            }
 
-            // Update last password change date
-            user.LastPasswordChangeDate = DateTime.UtcNow;
-            user.MustChangePassword = false;
-            user.UpdatedAt = DateTime.UtcNow;
-            await _userManager.UpdateAsync(user);
-            await _context.SaveChangesAsync();
+            var minAgeMinutes = _configuration.GetValue<int>("PasswordPolicy:MinimumAgeMinutes", 1);
+            if (user.LastPasswordChangeDate.HasValue)
+            {
+                var timeSinceChange = DateTime.UtcNow - user.LastPasswordChangeDate.Value;
+                if (timeSinceChange.TotalMinutes < minAgeMinutes)
+                {
+                    var remainingMinutes = minAgeMinutes - (int)timeSinceChange.TotalMinutes;
+                    ModelState.AddModelError(string.Empty,
+                        $"Cannot change password yet. Please wait {remainingMinutes} more minute(s).");
+                    return Page();
+                }
+            }
 
-            await _auditService.LogAsync(user.Id, "PasswordChanged", "Password changed successfully", HttpContext);
+            var result = await _userManager.ChangePasswordAsync(user, Input.CurrentPassword, Input.NewPassword);
 
-            await _signInManager.RefreshSignInAsync(user);
-            
-            TempData["SuccessMessage"] = "Your password has been changed successfully.";
-            return RedirectToPage("/Index");
+            if (result.Succeeded)
+            {
+                var passwordHistory = new PasswordHistory
+                {
+                    UserId = user.Id,
+                    PasswordHash = user.PasswordHash!,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.PasswordHistories.Add(passwordHistory);
+
+                user.LastPasswordChangeDate = DateTime.UtcNow;
+                user.MustChangePassword = false;
+                user.UpdatedAt = DateTime.UtcNow;
+                await _userManager.UpdateAsync(user);
+                await _context.SaveChangesAsync();
+
+                await _auditService.LogAsync(user.Id, "PasswordChanged", "Password changed successfully", HttpContext);
+
+                await _signInManager.RefreshSignInAsync(user);
+
+                TempData["SuccessMessage"] = "Your password has been changed successfully.";
+                return RedirectToPage("/Index");
+            }
+
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+
+            return Page();
         }
-
-        foreach (var error in result.Errors)
+        catch (Exception ex)
         {
-            ModelState.AddModelError(string.Empty, error.Description);
+            _logger.LogError(ex, "ChangePassword OnPost failed");
+            ModelState.AddModelError(string.Empty, "An error occurred. Please try again.");
+            return Page();
         }
-
-        return Page();
     }
 }

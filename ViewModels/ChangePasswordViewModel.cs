@@ -6,6 +6,7 @@ public class ChangePasswordViewModel
 {
     [Required(ErrorMessage = "Current password is required")]
     [DataType(DataType.Password)]
+    [StringLength(100, MinimumLength = 1)]
     [Display(Name = "Current Password")]
     public string CurrentPassword { get; set; } = string.Empty;
 

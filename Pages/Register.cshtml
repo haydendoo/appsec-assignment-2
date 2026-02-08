@@ -17,12 +17,12 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label asp-for="Input.FirstName" class="form-label"></label>
-                            <input asp-for="Input.FirstName" class="form-control" />
+                            <input asp-for="Input.FirstName" class="form-control" maxlength="50" />
                             <span asp-validation-for="Input.FirstName" class="text-danger"></span>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label asp-for="Input.LastName" class="form-label"></label>
-                            <input asp-for="Input.LastName" class="form-control" />
+                            <input asp-for="Input.LastName" class="form-control" maxlength="50" />
                             <span asp-validation-for="Input.LastName" class="text-danger"></span>
                         </div>
                     </div>
@@ -47,7 +47,7 @@
 
                     <div class="mb-3">
                         <label asp-for="Input.NRIC" class="form-label"></label>
-                        <input asp-for="Input.NRIC" class="form-control" placeholder="e.g., S1234567A" />
+                        <input asp-for="Input.NRIC" class="form-control" placeholder="e.g., S1234567A" maxlength="9" />
                         <span asp-validation-for="Input.NRIC" class="text-danger"></span>
                     </div>
 
@@ -80,15 +80,16 @@
 
                     <div class="mb-3">
                         <label asp-for="Input.Resume" class="form-label"></label>
-                        <input asp-for="Input.Resume" class="form-control" type="file" accept=".pdf,.docx" />
+                        <input asp-for="Input.Resume" class="form-control" type="file" accept=".pdf,.docx" id="resumeInput" />
                         <small class="text-muted">Accepted formats: PDF, DOCX (max 5MB)</small>
                         <span asp-validation-for="Input.Resume" class="text-danger d-block"></span>
+                        <div id="resumeError" class="text-danger small mt-1 d-none"></div>
                     </div>
 
                     <div class="mb-3">
                         <label asp-for="Input.WhoAmI" class="form-label"></label>
                         <textarea asp-for="Input.WhoAmI" class="form-control" rows="3" 
-                            placeholder="Tell us about yourself..."></textarea>
+                            placeholder="Tell us about yourself..." maxlength="500"></textarea>
                         <span asp-validation-for="Input.WhoAmI" class="text-danger"></span>
                     </div>
 
@@ -110,6 +111,36 @@
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
     <script src="~/js/password-strength.js"></script>
+    <script>
+        (function () {
+            var form = document.getElementById('registerForm');
+            var input = document.getElementById('resumeInput');
+            var errorEl = document.getElementById('resumeError');
+            if (!form || !input) return;
+            var maxSizeBytes = 5 * 1024 * 1024;
+            var allowedExtensions = ['.pdf', '.docx'];
+            form.addEventListener('submit', function (e) {
+                var file = input.files && input.files[0];
+                errorEl.classList.add('d-none');
+                errorEl.textContent = '';
+                if (file) {
+                    var ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+                    if (allowedExtensions.indexOf(ext) === -1) {
+                        e.preventDefault();
+                        errorEl.textContent = 'Only PDF and DOCX files are allowed.';
+                        errorEl.classList.remove('d-none');
+                        return;
+                    }
+                    if (file.size > maxSizeBytes) {
+                        e.preventDefault();
+                        errorEl.textContent = 'File size cannot exceed 5MB.';
+                        errorEl.classList.remove('d-none');
+                        return;
+                    }
+                }
+            });
+        })();
+    </script>
     @if (!string.IsNullOrEmpty(Model.RecaptchaSiteKey))
     {
         <script src="https://www.google.com/recaptcha/api.js?render=@Model.RecaptchaSiteKey"></script>

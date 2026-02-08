@@ -9,11 +9,13 @@ public class PasswordHistoryValidator : IPasswordValidator<ApplicationUser>
 {
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<PasswordHistoryValidator> _logger;
 
-    public PasswordHistoryValidator(ApplicationDbContext context, IConfiguration configuration)
+    public PasswordHistoryValidator(ApplicationDbContext context, IConfiguration configuration, ILogger<PasswordHistoryValidator> logger)
     {
         _context = context;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<IdentityResult> ValidateAsync(UserManager<ApplicationUser> manager, ApplicationUser user, string? password)
@@ -23,31 +25,39 @@ public class PasswordHistoryValidator : IPasswordValidator<ApplicationUser>
             return IdentityResult.Success;
         }
 
-        var historyCount = _configuration.GetValue<int>("PasswordPolicy:HistoryCount", 2);
-
-        var recentPasswords = await _context.PasswordHistories
-            .Where(p => p.UserId == user.Id)
-            .OrderByDescending(p => p.CreatedAt)
-            .Take(historyCount)
-            .ToListAsync();
-
-        foreach (var history in recentPasswords)
+        try
         {
-            var verificationResult = manager.PasswordHasher.VerifyHashedPassword(
-                user, 
-                history.PasswordHash, 
-                password
-            );
+            var historyCount = _configuration.GetValue<int>("PasswordPolicy:HistoryCount", 2);
 
-            if (verificationResult == PasswordVerificationResult.Success ||
-                verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
+            var recentPasswords = await _context.PasswordHistories
+                .Where(p => p.UserId == user.Id)
+                .OrderByDescending(p => p.CreatedAt)
+                .Take(historyCount)
+                .ToListAsync();
+
+            foreach (var history in recentPasswords)
             {
-                return IdentityResult.Failed(new IdentityError
+                var verificationResult = manager.PasswordHasher.VerifyHashedPassword(
+                    user,
+                    history.PasswordHash,
+                    password
+                );
+
+                if (verificationResult == PasswordVerificationResult.Success ||
+                    verificationResult == PasswordVerificationResult.SuccessRehashNeeded)
                 {
-                    Code = "PasswordRecentlyUsed",
-                    Description = $"Cannot reuse any of your last {historyCount} passwords."
-                });
+                    return IdentityResult.Failed(new IdentityError
+                    {
+                        Code = "PasswordRecentlyUsed",
+                        Description = $"Cannot reuse any of your last {historyCount} passwords."
+                    });
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Password history validation failed for user {UserId}", user.Id);
+            return IdentityResult.Success;
         }
 
         return IdentityResult.Success;

@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -8,20 +7,9 @@ namespace appsec_assignment_2.Pages;
 [IgnoreAntiforgeryToken]
 public class ErrorModel : PageModel
 {
-    public string? RequestId { get; set; }
-
-    public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
-
-    private readonly ILogger<ErrorModel> _logger;
-
-    public ErrorModel(ILogger<ErrorModel> logger)
+    public IActionResult OnGet()
     {
-        _logger = logger;
-    }
-
-    public void OnGet()
-    {
-        RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+        return Redirect("/Errors/500");
     }
 }
 

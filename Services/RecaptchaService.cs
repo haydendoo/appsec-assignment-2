@@ -42,7 +42,8 @@ public class RecaptchaService
             );
 
             var json = await response.Content.ReadAsStringAsync();
-            var result = JsonSerializer.Deserialize<RecaptchaApiResponse>(json);
+            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var result = JsonSerializer.Deserialize<RecaptchaApiResponse>(json, options);
 
             return new RecaptchaResponse
             {
